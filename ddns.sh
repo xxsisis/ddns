@@ -13,13 +13,12 @@ Tip="${YELLOW}[提示]${NC}"
 
 cop_info(){
 clear
-echo -e "${GREEN}
-######################################
-#      ${RED}DDNS 一键脚本                ${GREEN}#
-#     ${YELLOW}作者:AICM                     ${GREEN}#
-#    ${GREEN}https://110.al                 ${GREEN}#
+echo -e "${GREEN}######################################
+#       ${RED}DDNS 一键脚本${GREEN}               #
+#         作者: ${YELLOW}AICM${GREEN}             #
+#      ${GREEN}https://110.al${GREEN}             #
 ######################################${NC}"
-echo
+
 }
 
 # 检查系统是否为 Debian、Ubuntu 或 Alpine
