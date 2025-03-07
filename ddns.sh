@@ -76,7 +76,7 @@ check_curl() {
 # 开始安装DDNS
 install_ddns(){
     if [ ! -f "/usr/bin/ddns" ]; then
-        curl -o /usr/bin/ddns https://raw.githubusercontent.com/mocchen/cssmeihua/mochen/shell/ddns.sh && chmod +x /usr/bin/ddns
+        curl -o /usr/bin/ddns https://raw.githubusercontent.com/xxsisis/shell/main/ddns.sh && chmod +x /usr/bin/ddns
     fi
     mkdir -p /etc/DDNS
     cat <<'EOF' > /etc/DDNS/DDNS
@@ -252,35 +252,51 @@ fi
 
 # 发送 Telegram 通知函数
 send_telegram_notification() {
-    local message=""
-
-    # 遍历 Domains 数组，构建域名部分
-    for domain in "${Domains[@]}"; do
-        message+="$domain "
-    done
-
-    # 添加 IPv4 更新信息
-    message+="IPv4更新 $Old_Public_IPv4 🔜 $Public_IPv4 。"
-
-    # 如果 ipv6_set 为 true，则添加 IPv6 更新信息
-    if [ "$ipv6_set" == "true" ]; then
-        # 检查 Domains 和 Domainsv6 是否相同
-        if [ "${Domains[*]}" != "${Domainsv6[*]}" ]; then
-            # 遍历 Domainsv6 数组，构建 IPv6 域名部分
-            for domainv6 in "${Domainsv6[@]}"; do
-                message+="$domainv6 "
-            done
+    local message="🌐 DDNS IP 更新通知 🌐%0A%0A"
+    
+    # IPv4更新部分
+    if [[ -n "$Public_IPv4" && "$Public_IPv4" != "$Old_Public_IPv4" ]]; then
+        message+="📊 IPv4 更新详情 📊%0A"
+        message+="🔄 结果: success%0A"
+        message+="📍 旧 IPv4: $Old_Public_IPv4%0A"
+        message+="📍 新 IPv4: $Public_IPv4%0A"
+        
+        # 构建域名列表（逗号分隔）
+        if [[ ${#Domains[@]} -gt 0 ]]; then
+            domains_v4=$(IFS=, ; echo "${Domains[*]}")
+        else
+            domains_v4="未配置域名"
         fi
-
-        # 添加 IPv6 更新信息
-        message+="IPv6更新 $Old_Public_IPv6 🔜 $Public_IPv6 。"
+        message+="🔗 域名: $domains_v4%0A%0A"
     fi
 
-    # 发送通知
-    curl -s -X POST "https://api.telegram.org/bot$Telegram_Bot_Token/sendMessage" \
-        -d "chat_id=$Telegram_Chat_ID" \
-        -d "text=$message"
+    # IPv6更新部分
+    if [[ "$ipv6_set" == "true" && -n "$Public_IPv6" && "$Public_IPv6" != "$Old_Public_IPv6" ]]; then
+        message+="📊 IPv6 更新详情 📊%0A"
+        message+="🔄 结果: success%0A"
+        message+="📍 旧 IPv6: $Old_Public_IPv6%0A"
+        message+="📍 新 IPv6: $Public_IPv6%0A"
+        
+        # 构建域名列表（逗号分隔）
+        if [[ ${#Domainsv6[@]} -gt 0 ]]; then
+            domains_v6=$(IFS=, ; echo "${Domainsv6[*]}")
+        else
+            domains_v6="未配置域名"
+        fi
+        message+="🔗 域名: $domains_v6%0A%0A"
+    fi
+
+    # 去除末尾多余的换行
+    message=${message%%%0A}
+
+    # 发送通知（增加超时和重试）
+    if [[ -n "$Telegram_Bot_Token" && "$Telegram_Bot_Token" != "your_telegram_token" ]]; then
+        curl -s --max-time 10 --retry 2 -X POST "https://api.telegram.org/bot$Telegram_Bot_Token/sendMessage" \
+            -d "chat_id=$Telegram_Chat_ID" \
+            -d "text=$message"
+    fi
 }
+
 
 EOF
     chmod +x /etc/DDNS/DDNS && chmod +x /etc/DDNS/.config
