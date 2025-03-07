@@ -15,9 +15,9 @@ cop_info(){
 clear
 echo -e "${GREEN}
 ######################################
-#      ${RED}DDNS 一键脚本    ${GREEN}#
-#     ${YELLOW}作者:AICM     ${GREEN}#
-#    ${GREEN}https://110.al  ${GREEN}#
+#      ${RED}DDNS 一键脚本                ${GREEN}#
+#     ${YELLOW}作者:AICM                     ${GREEN}#
+#    ${GREEN}https://110.al                 ${GREEN}#
 ######################################${NC}"
 echo
 }
