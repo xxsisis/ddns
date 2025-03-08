@@ -79,12 +79,6 @@ install_ddns(){
         curl -o /usr/bin/ddns https://raw.githubusercontent.com/xxsisis/shell/main/ddns.sh && chmod +x /usr/bin/ddns
     fi
     mkdir -p /etc/DDNS
-    
-    # 新增服务器名称配置
-    echo -e "${Tip}请输入服务器标识名称（如：香港节点/AWS东京）"
-    read -p "(默认：我的服务器): " server_name
-    server_name=${server_name:-"我的服务器"}
-    
     cat <<'EOF' > /etc/DDNS/DDNS
 #!/bin/bash
 
@@ -170,17 +164,12 @@ if [[ -n "$Public_IPv6" && "$Public_IPv6" != "$Old_Public_IPv6" ]]; then
     sed -i "s/^Old_Public_IPv6=.*/Old_Public_IPv6=\"$Public_IPv6\"/" /etc/DDNS/.config
 fi
 EOF
-
-    # 修改后的配置文件模板
-    cat <<EOF > /etc/DDNS/.config
-# 服务器标识名称
-Server_Name="$server_name"
-
+    cat <<'EOF' > /etc/DDNS/.config
 # 多域名支持
 Domains=("your_domain1.com" "your_domain2.com")     # 你要解析的IPv4域名数组
 ipv6_set="setting"                                    # 开启 IPv6 解析
 Domainsv6=("your_domainv6_1.com" "your_domainv6_2.com")  # 你要解析的IPv6域名数组
-Email="your_email@gmail.com"                       # 你的 Cloudflare 注册邮箱
+Email="your_email@gmail.com"                       # 你在 Cloudflare 注册的邮箱
 Api_key="your_api_key"                             # 你的 Cloudflare API 密钥
 
 # Telegram Bot Token 和 Chat ID
@@ -191,7 +180,7 @@ Telegram_Chat_ID=""
 regex_pattern='^(eth|ens|eno|esp|enp)[0-9]+'
 
 # 获取网络接口列表
-InterFace=($(ip link show | awk -F': ' '{print $2}' | grep -E "\$regex_pattern" | sed "s/@.*//g"))
+InterFace=($(ip link show | awk -F': ' '{print $2}' | grep -E "$regex_pattern" | sed "s/@.*//g"))
 
 Public_IPv4=""
 Public_IPv6=""
@@ -213,12 +202,12 @@ if grep -qiE "debian|ubuntu" /etc/os-release; then
         fi
 
         # 验证获取到的 IPv4 地址是否是有效的 IP 地址
-        if [[ -n "$ipv4" && "$ipv4" =~ \$ipv4Regex ]]; then
+        if [[ -n "$ipv4" && "$ipv4" =~ $ipv4Regex ]]; then
             Public_IPv4="$ipv4"
         fi
 
         # 检查是否启用了 IPv6 解析
-        if [[ "\$ipv6_set" == "true" ]]; then
+        if [[ "$ipv6_set" == "true" ]]; then
             # 尝试通过第一个接口获取 IPv6 地址
             ipv6=$(curl -s6 --max-time 3 --interface "$i" ip.sb -k | grep -E -v '^(2a09|104\.28)' || true)
 
@@ -228,7 +217,7 @@ if grep -qiE "debian|ubuntu" /etc/os-release; then
             fi
 
             # 验证获取到的 IPv6 地址是否是有效的 IP 地址
-            if [[ -n "$ipv6" && "$ipv6" =~ \$ipv6Regex ]]; then
+            if [[ -n "$ipv6" && "$ipv6" =~ $ipv6Regex ]]; then
                 Public_IPv6="$ipv6"
             fi
         fi
@@ -242,12 +231,12 @@ else
     fi
 
     # 验证获取到的 IPv4 地址是否是有效的 IP 地址
-    if [[ -n "$ipv4" && "$ipv4" =~ \$ipv4Regex ]]; then
+    if [[ -n "$ipv4" && "$ipv4" =~ $ipv4Regex ]]; then
         Public_IPv4="$ipv4"
     fi
 
     # 检查是否启用了 IPv6 解析
-    if [[ "\$ipv6_set" == "true" ]]; then
+    if [[ "$ipv6_set" == "true" ]]; then
         # 尝试获取 IPv6 地址
         ipv6=$(curl -s6 --max-time 3 ip.sb -k | grep -E -v '^(2a09|104\.28)' || true)
         if [[ -z "$ipv6" ]]; then
@@ -255,7 +244,7 @@ else
         fi
 
         # 验证获取到的 IPv6 地址是否是有效的 IP 地址
-        if [[ -n "$ipv6" && "$ipv6" =~ \$ipv6Regex ]]; then
+        if [[ -n "$ipv6" && "$ipv6" =~ $ipv6Regex ]]; then
             Public_IPv6="$ipv6"
         fi
     fi
@@ -263,31 +252,48 @@ fi
 
 # 发送 Telegram 通知函数
 send_telegram_notification() {
-    local message="🖥️ <b>${Server_Name}</b> 动态IP变更通知%0A%0A"
+    local message="🌐 DDNS IP 更新通知 🌐%0A%0A"
     
     # IPv4更新部分
-    if [[ -n "\$Public_IPv4" && "\$Public_IPv4" != "\$Old_Public_IPv4" ]]; then
-        message+="📡 <u>IPv4 变更记录</u> %0A"
-        message+="🕒 时间: \$(date '+%Y-%m-%d %H:%M:%S') %0A"
-        message+="📥 旧地址: \$Old_Public_IPv4 %0A"
-        message+="📤 新地址: \$Public_IPv4 %0A%0A"
+    if [[ -n "$Public_IPv4" && "$Public_IPv4" != "$Old_Public_IPv4" ]]; then
+        message+="📊 IPv4 更新详情 📊%0A"
+        message+="🔄 结果: success%0A"
+        message+="📍 旧 IPv4: $Old_Public_IPv4%0A"
+        message+="📍 新 IPv4: $Public_IPv4%0A"
+        
+        # 构建域名列表（逗号分隔）
+        if [[ ${#Domains[@]} -gt 0 ]]; then
+            domains_v4=$(IFS=, ; echo "${Domains[*]}")
+        else
+            domains_v4="未配置域名"
+        fi
+        message+="🔗 域名: $domains_v4%0A%0A"
     fi
 
     # IPv6更新部分
-    if [[ "\$ipv6_set" == "true" && -n "\$Public_IPv6" && "\$Public_IPv6" != "\$Old_Public_IPv6" ]]; then
-        message+="📡 <u>IPv6 变更记录</u> %0A"
-        message+="🕒 时间: \$(date '+%Y-%m-%d %H:%M:%S') %0A"
-        message+="📥 旧地址: \$Old_Public_IPv6 %0A"
-        message+="📤 新地址: \$Public_IPv6 %0A%0A"
+    if [[ "$ipv6_set" == "true" && -n "$Public_IPv6" && "$Public_IPv6" != "$Old_Public_IPv6" ]]; then
+        message+="📊 IPv6 更新详情 📊%0A"
+        message+="🔄 结果: success%0A"
+        message+="📍 旧 IPv6: $Old_Public_IPv6%0A"
+        message+="📍 新 IPv6: $Public_IPv6%0A"
+        
+        # 构建域名列表（逗号分隔）
+        if [[ ${#Domainsv6[@]} -gt 0 ]]; then
+            domains_v6=$(IFS=, ; echo "${Domainsv6[*]}")
+        else
+            domains_v6="未配置域名"
+        fi
+        message+="🔗 域名: $domains_v6%0A%0A"
     fi
 
-    message=\${message%%%0A}
+    # 去除末尾多余的换行
+    message=${message%%%0A}
 
-    if [[ -n "\$Telegram_Bot_Token" && "\$Telegram_Bot_Token" != "your_telegram_token" ]]; then
-        curl -s --max-time 10 --retry 2 -X POST "https://api.telegram.org/bot\$Telegram_Bot_Token/sendMessage" \
-            -d "chat_id=\$Telegram_Chat_ID" \
-            -d "text=\$message" \
-            -d "parse_mode=html"
+    # 发送通知（增加超时和重试）
+    if [[ -n "$Telegram_Bot_Token" && "$Telegram_Bot_Token" != "your_telegram_token" ]]; then
+        curl -s --max-time 10 --retry 2 -X POST "https://api.telegram.org/bot$Telegram_Bot_Token/sendMessage" \
+            -d "chat_id=$Telegram_Chat_ID" \
+            -d "text=$message"
     fi
 }
 
@@ -332,12 +338,11 @@ go_ahead(){
   ${GREEN}4${NC}：修改要解析的域名
   ${GREEN}5${NC}：修改 Cloudflare Api
   ${GREEN}6${NC}：配置 Telegram 通知
-  ${GREEN}7${NC}：更改 DDNS 运行时间
-  ${GREEN}8${NC}：设置服务器名称"  # 新增设置服务器名称选项
+  ${GREEN}7${NC}：更改 DDNS 运行时间"  # 添加新选项
     echo
     read -p "选项: " option
-    until [[ "$option" =~ ^[0-8]$ ]]; do  # 更新有效选项范围
-        echo -e "${Error}请输入正确的数字 [0-8]"
+    until [[ "$option" =~ ^[0-7]$ ]]; do  # 更新有效选项范围
+        echo -e "${Error}请输入正确的数字 [0-7]"
         echo
         exit 1
     done
@@ -390,34 +395,149 @@ go_ahead(){
             check_ddns_install
         ;;
         7)
-            set_ddns_run_interval
-            sleep 2
-            check_ddns_install
-        ;;
-        8)
-            set_server_name  # 新增设置服务器名称功能
+            set_ddns_run_interval  # 调用新函数以更改 DDNS 运行时间
             sleep 2
             check_ddns_install
         ;;
     esac
 }
 
-# 新增设置服务器名称函数
-set_server_name() {
-    clear
-    current_name=$(grep '^Server_Name=' /etc/DDNS/.config | cut -d '"' -f2)
-    echo -e "${GREEN}当前服务器名称：${YELLOW}${current_name}${NC}"
-    read -p "请输入新服务器名称：" new_name
-    if [[ -n "$new_name" ]]; then
-        sed -i "s/^Server_Name=.*/Server_Name=\"$new_name\"/" /etc/DDNS/.config
-        echo -e "${GREEN}服务器名称已更新！${NC}"
+# 设置Cloudflare Api
+set_cloudflare_api(){
+    echo -e "${Tip}开始配置CloudFlare API..."
+    echo
+
+    echo -e "${Tip}请输入您的Cloudflare邮箱"
+    read -rp "邮箱: " EMail
+    if [ -z "$EMail" ]; then
+        echo -e "${Error}未输入邮箱，无法执行操作！"
+        exit 1
     else
-        echo -e "${RED}输入不能为空！${NC}"
+        EMAIL="$EMail"
     fi
-    read -n 1 -s -r -p "按任意键返回菜单..."
+    echo -e "${Info}你的邮箱：${RED_ground}${EMAIL}${NC}"
+    echo
+
+    echo -e "${Tip}请输入您的Cloudflare API密钥"
+    read -rp "密钥: " Api_Key
+    if [ -z "Api_Key" ]; then
+        echo -e "${Error}未输入密钥，无法执行操作！"
+        exit 1
+    else
+        API_KEY="$Api_Key"
+    fi
+    echo -e "${Info}你的密钥：${RED_ground}${API_KEY}${NC}"
+    echo
+
+    sed -i 's/^#\?Email=".*"/Email="'"${EMAIL}"'"/g' /etc/DDNS/.config
+    sed -i 's/^#\?Api_key=".*"/Api_key="'"${API_KEY}"'"/g' /etc/DDNS/.config
 }
 
-# 以下保持原有函数不变（set_cloudflare_api、set_domain、set_telegram_settings等）
+# 设置解析的域名
+set_domain() {
+    # 检查是否有IPv4
+    ipv4_check=$(curl -s ip.sb -4)
+    if [ -n "$ipv4_check" ]; then
+        echo -e "${Info}检测到IPv4地址: ${ipv4_check}"
+        echo -e "${Tip}请输入您要解析的IPv4域名（可解析多个域名，使用逗号分隔） (或按回车跳过)"
+        read -rp "IPv4域名: " Domain_input
+        if [ -z "$Domain_input" ]; then
+            echo -e "${Info}跳过IPv4域名设置。"
+        else
+            # 替换中文逗号为英文逗号
+            Domain_input="${Domain_input//，/,}"
+            IFS=',' read -ra Domains <<< "$Domain_input"
+            echo -e "${Info}你输入的IPv4域名为: ${RED_ground}${Domains[*]}${NC}"
+            echo
+            # 更新 .config 文件中的 IPv4 域名数组，保持原位置修改
+            sed -i '/^Domains=/c\Domains=('"${Domains[*]}"')' /etc/DDNS/.config
+        fi
+    else
+        echo -e "${Info}未检测到IPv4地址，跳过IPv4域名设置。"
+        echo
+    fi
+
+    # 检查是否有IPv6
+    ipv6_check=$(curl -s ip.sb -6)
+    if [ -n "$ipv6_check" ]; then
+        echo -e "${Info}检测到IPv6地址: ${ipv6_check}"
+
+        # 检查是否开启 IPv6 解析
+        while true; do
+            echo -e "${Tip}是否开启 IPv6 解析？(y/n)"
+            read -rp "选择: " enable_ipv6
+
+            if [[ "$enable_ipv6" =~ ^[Yy]$ ]]; then
+                ipv6_set="true"
+                # 更新 .config 文件中的 ipv6_set 为 true
+                sed -i 's/^#\?ipv6_set=".*"/ipv6_set="true"/g' /etc/DDNS/.config
+
+                echo -e "${Tip}请输入您要解析的IPv6域名（可解析多个域名，使用逗号分隔） (或按回车跳过)"
+                read -rp "IPv6域名: " Domainv6_input
+
+                if [ -z "$Domainv6_input" ]; then
+                    echo -e "${Info}跳过IPv6域名设置。"
+                    echo
+                else
+                    # 替换中文逗号为英文逗号
+                    Domainv6_input="${Domainv6_input//，/,}"
+                    IFS=',' read -ra Domainsv6 <<< "$Domainv6_input"
+                    echo -e "${Info}你输入的IPv6域名为: ${RED_ground}${Domainsv6[*]}${NC}"
+                    echo
+                    # 更新 .config 文件中的 IPv6 域名数组，保持原位置修改
+                    sed -i '/^Domainsv6=/c\Domainsv6=('"${Domainsv6[*]}"')' /etc/DDNS/.config
+                fi
+                break
+            elif [[ "$enable_ipv6" =~ ^[Nn]$ ]]; then
+                ipv6_set="false"
+                # 更新 .config 文件中的 ipv6_set 为 false
+                sed -i 's/^#\?ipv6_set=".*"/ipv6_set="false"/g' /etc/DDNS/.config
+                echo -e "${Info}IPv6 解析未开启，跳过 IPv6 域名设置。"
+                echo
+                break
+            else
+                echo -e "${Error}无效输入，请输入 'y' 或 'n'。"
+            fi
+        done
+    else
+        echo -e "${Info}未检测到IPv6地址，跳过IPv6域名设置。"
+        echo
+        ipv6_set="false"
+        # 更新 .config 文件中的 ipv6_set 为 false
+        sed -i 's/^#\?ipv6_set=".*"/ipv6_set="false"/g' /etc/DDNS/.config
+    fi
+}
+
+# 设置Telegram参数
+set_telegram_settings(){
+    echo -e "${Info}开始配置Telegram通知设置..."
+    echo
+
+    echo -e "${Tip}请输入您的Telegram Bot Token，如果不使用Telegram通知请直接按 Enter 跳过"
+    read -rp "Token: " Token
+    if [ -n "$Token" ]; then
+        TELEGRAM_BOT_TOKEN="$Token"
+        echo -e "${Info}你的TOKEN：${RED_ground}$TELEGRAM_BOT_TOKEN${NC}"
+        echo
+
+        echo -e "${Tip}请输入您的Telegram Chat ID，如果不使用Telegram通知请直接按 Enter 跳过"
+        read -rp "Chat ID: " Chat_ID
+        if [ -n "$Chat_ID" ]; then
+            TELEGRAM_CHAT_ID="$Chat_ID"
+            echo -e "${Info}你的Chat ID：${RED_ground}$TELEGRAM_CHAT_ID${NC}"
+            echo
+
+            sed -i 's/^#\?Telegram_Bot_Token=".*"/Telegram_Bot_Token="'"${TELEGRAM_BOT_TOKEN}"'"/g' /etc/DDNS/.config
+            sed -i 's/^#\?Telegram_Chat_ID=".*"/Telegram_Chat_ID="'"${TELEGRAM_CHAT_ID}"'"/g' /etc/DDNS/.config
+        else
+            echo -e "${Info}已跳过设置Telegram Chat ID"
+        fi
+    else
+        echo -e "${Info}已跳过设置Telegram Bot Token和Chat ID"
+        echo
+        return  # 如果没有输入 Token，则直接返回，跳过设置 Chat ID 的步骤
+    fi
+}
 
 # 运行DDNS服务
 run_ddns() {
@@ -467,6 +587,104 @@ WantedBy=multi-user.target'
         else
             echo -e "${Tip}服务和定时器单元文件已存在，无需再次创建！"
         fi
+    fi
+}
+
+# 更改 DDNS 服务的运行时间（单位：分钟）
+set_ddns_run_interval() {
+    read -rp "请输入新的 DDNS 运行间隔（分钟）： " interval
+
+    # 输入验证
+    if ! [[ "$interval" =~ ^[0-9]+$ ]]; then
+        echo -e "${Error}无效输入！请输入一个正整数。"
+        return 1
+    fi
+
+    if grep -qiE "alpine" /etc/os-release; then
+        # 在 Alpine Linux 上更新 cron 任务
+        echo -e "${Info}正在更新 DDNS 脚本的 cron 任务... "
+
+        # 计算 cron 表达式
+        local cron_time="*/$interval * * * * /bin/bash /etc/DDNS/DDNS >/dev/null 2>&1"
+
+        # 检查 cron 任务是否已存在，防止重复添加
+        if crontab -l | grep -q "/etc/DDNS/DDNS"; then
+            # 删除旧的 cron 任务
+            (crontab -l | grep -v "/etc/DDNS/DDNS") | crontab -
+        fi
+        # 添加新的 cron 任务
+        (crontab -l; echo "$cron_time") | crontab -
+        echo -e "${Info}DDNS 脚本已设置为每 ${interval} 分钟运行一次！"
+    else
+        # 在 Debian/Ubuntu 上更新 systemd 定时器
+        echo -e "${Info}正在更新 DDNS 定时器... "
+
+        # 停止并禁用旧的定时器
+        systemctl stop ddns.timer
+        systemctl disable ddns.timer
+
+        # 修改定时器文件，将单位设置为分钟
+        sed -i "s/OnUnitActiveSec=.*s/OnUnitActiveSec=${interval}m/" /etc/systemd/system/ddns.timer
+
+        # 重新加载 systemd 管理器配置
+        systemctl daemon-reload
+
+        # 启动并启用新的定时器
+        systemctl enable --now ddns.timer
+        echo -e "${Info}DDNS 定时器已设置为每 ${interval} 分钟运行一次！"
+    fi
+}
+
+restart_ddns() {
+    if grep -qiE "alpine" /etc/os-release; then
+        echo -e "${Info}重新启动 ddns 脚本..."
+
+        # 获取当前的 cron 任务
+        current_cron=$(crontab -l | grep "/bin/bash /etc/DDNS/DDNS" || true)
+
+        # 如果当前的 cron 任务存在，则替换
+        if [ -n "$current_cron" ]; then
+            # 删除旧的 cron 任务
+            crontab -l | grep -v "/bin/bash /etc/DDNS/DDNS" | crontab -
+
+            # 添加新的 cron 任务
+            new_cron="${current_cron} >/dev/null 2>&1"
+            (crontab -l; echo "$new_cron") | crontab -
+
+            echo -e "${Info}DDNS 已重启！"
+        else
+            echo -e "${Error}未找到现有的 cron 任务，无法重启 DDNS。"
+            read -rp "是否要添加一个新的 DDNS 任务（每 2 分钟）？[y/n] " add_cron
+            if [[ "$add_cron" == "y" || "$add_cron" == "Y" ]]; then
+                # 添加新的 cron 任务
+                new_cron="*/2 * * * * /bin/bash /etc/DDNS/DDNS >/dev/null 2>&1"
+                (crontab -l; echo "$new_cron") | crontab -
+                echo -e "${Info}已添加新的 DDNS 任务，每 2 分钟运行一次！"
+            else
+                echo -e "${Info}未添加新的 DDNS 任务。"
+                return 1  # 返回失败状态
+            fi
+        fi
+    else
+        echo -e "${Info}重启 DDNS 服务... "
+        systemctl restart ddns.service >/dev/null 2>&1
+        systemctl restart ddns.timer >/dev/null 2>&1
+        echo -e "${Info}DDNS 已重启！"
+    fi
+}
+
+# 停止DDNS服务
+stop_ddns(){
+    if grep -qiE "alpine" /etc/os-release; then
+        echo -e "${Info}停止 ddns 脚本..."
+        # 从 cron 中移除 ddns 任务
+        crontab -l | grep -v "/bin/bash /etc/DDNS/DDNS >/dev/null 2>&1" | crontab -
+        echo -e "${Info}DDNS 已停止！"
+    else
+        echo -e "${Info}停止 DDNS 服务..."
+        systemctl stop ddns.service >/dev/null 2>&1
+        systemctl stop ddns.timer >/dev/null 2>&1
+        echo -e "${Info}DDNS 已停止！"
     fi
 }
 
